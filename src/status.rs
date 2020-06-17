@@ -11,10 +11,10 @@ pub fn main(path: String) {
   };
   let ref_name = head.name().unwrap();
   let name = branch_name(ref_name.to_string());
-  println!("{}", &onbranch(name));
+  println!("{}", &on_branch(name));
 }
 
-fn onbranch(branch_name: String) -> String {
+fn on_branch(branch_name: String) -> String {
   let message = format!("On branch {}", branch_name);
   return message.to_string();
 }
