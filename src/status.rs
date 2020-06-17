@@ -1,7 +1,7 @@
 use git2::Repository;
 
-pub fn main() {
-  let repo = match Repository::open("./") {
+pub fn main(path: String) {
+  let repo = match Repository::open(path) {
     Ok(repo) => repo,
     Err(e) => panic!("failed to open: {}", e),
   };
