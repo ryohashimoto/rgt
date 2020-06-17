@@ -1,0 +1,6 @@
+[package]
+name = "rgt"
+version = "0.1.0"
+authors = ["Ryo Hashimoto <ryohashimoto@gmail.com>"]
+
+[dependencies]
