@@ -2,5 +2,7 @@
 name = "rgt"
 version = "0.1.0"
 authors = ["Ryo Hashimoto <ryohashimoto@gmail.com>"]
+edition = "2018"
 
 [dependencies]
+git2 = "0.13"
