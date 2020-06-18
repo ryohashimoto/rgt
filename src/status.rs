@@ -1,5 +1,11 @@
+extern crate termion;
+
 use git2::Repository;
+use std::io::{stdout, Write};
 use std::process::Command;
+use termion::cursor;
+use termion::raw::IntoRawMode;
+use termion::{clear, color};
 
 struct FileIndex {
   status: String,
@@ -7,6 +13,36 @@ struct FileIndex {
 }
 
 pub fn main(path: String) {
+  let mut stdout = stdout().into_raw_mode().unwrap();
+  write!(stdout, "{}", clear::All).unwrap();
+  write!(stdout, "{}", cursor::Goto(1, 1)).unwrap();
+
+  let name = branch_name(path);
+  write!(stdout, "{}On branch {}", color::Fg(color::Green), name).unwrap();
+  write!(stdout, "\r\n{}", color::Fg(color::Reset)).unwrap();
+  write!(
+    stdout,
+    "{}Changes not staged for commit:",
+    color::Fg(color::Blue)
+  )
+  .unwrap();
+  write!(stdout, "\r\n{}", color::Fg(color::Reset)).unwrap();
+  for file_index in modified_file_indexes() {
+    write!(
+      stdout,
+      "{}{}{} ",
+      color::Fg(color::Magenta),
+      file_index.status,
+      color::Fg(color::Reset)
+    )
+    .unwrap();
+    write!(stdout, "{}", file_index.name).unwrap();
+    write!(stdout, "\r\n").unwrap();
+  }
+  stdout.flush().unwrap();
+}
+
+fn ref_name(path: String) -> String {
   let repo = match Repository::open(path) {
     Ok(repo) => repo,
     Err(e) => panic!("failed to open: {}", e),
@@ -16,24 +52,11 @@ pub fn main(path: String) {
     Err(e) => panic!("failed to open: {}", e),
   };
   let ref_name = head.name().unwrap();
-  let name = branch_name(ref_name.to_string());
-  println!("{}", &on_branch(name));
-  let files: Vec<String> = modified_file_indexes()
-    .into_iter()
-    .map(|file| format!("{} {}", &file.status, &file.name))
-    .rev()
-    .collect();
-  for file in files {
-    println!("{}", &file);
-  }
+  return ref_name.to_string();
 }
 
-fn on_branch(branch_name: String) -> String {
-  let message = format!("On branch {}", branch_name);
-  return message.to_string();
-}
-
-fn branch_name(ref_name: String) -> String {
+fn branch_name(path: String) -> String {
+  let ref_name = ref_name(path);
   let pattern = "refs/heads/";
   if ref_name.starts_with(pattern) {
     return ref_name.trim_start_matches(pattern).to_string();
