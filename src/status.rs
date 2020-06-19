@@ -1,6 +1,7 @@
 extern crate termion;
 mod file_status;
 
+use std::collections::LinkedList;
 use std::io::{stdin, stdout, Write};
 use termion::cursor;
 use termion::event::{Event, Key};
@@ -15,23 +16,39 @@ struct Cursor {
   column: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct FileRow {
+  line_index: usize,
+  file_index: file_status::FileIndex,
+}
+
 // internal state of the rgt status screen
 struct RGTStatus {
   cursor: Cursor,
-  lines: usize,
   branch_name: String,
   staged_file_indexes: Vec<file_status::FileIndex>,
   modified_file_indexes: Vec<file_status::FileIndex>,
+  file_list: LinkedList<FileRow>,
+  file_row: FileRow,
+  max_line_index: usize,
 }
 
 impl Default for RGTStatus {
   fn default() -> Self {
     Self {
       cursor: Cursor { row: 0, column: 0 },
-      lines: 10, // TODO: Get from actual lines
       branch_name: "".to_string(),
       staged_file_indexes: Vec::new(),
       modified_file_indexes: Vec::new(),
+      file_list: LinkedList::new(),
+      file_row: FileRow {
+        line_index: 0,
+        file_index: file_status::FileIndex {
+          status: "".to_string(),
+          name: "".to_string(),
+        },
+      },
+      max_line_index: 0,
     }
   }
 }
@@ -41,6 +58,32 @@ impl RGTStatus {
     self.branch_name = file_status::branch_name(path);
     self.staged_file_indexes = file_status::staged_file_indexes();
     self.modified_file_indexes = file_status::modified_file_indexes();
+    self.file_list = LinkedList::new();
+    let mut line_index = 2;
+    for file_index in &self.staged_file_indexes {
+      let file_row = FileRow {
+        line_index: line_index,
+        file_index: file_index.clone(),
+      };
+      if self.file_list.is_empty() {
+        self.file_row = file_row.clone();
+      }
+      self.file_list.push_back(file_row);
+      line_index += 1;
+    }
+    line_index += 1;
+    for file_index in &self.modified_file_indexes {
+      let file_row = FileRow {
+        line_index: line_index,
+        file_index: file_index.clone(),
+      };
+      if self.file_list.is_empty() {
+        self.file_row = file_row.clone();
+      }
+      self.file_list.push_back(file_row);
+      line_index += 1;
+    }
+    self.max_line_index = line_index;
   }
 
   fn draw<T: Write>(&self, out: &mut T) {
@@ -49,45 +92,48 @@ impl RGTStatus {
 
     write!(
       out,
-      "{}On branch {}",
+      "{}On branch {}\r\n{}",
       color::Fg(color::Green),
-      self.branch_name
+      self.branch_name,
+      color::Fg(color::Reset)
     )
     .unwrap();
-    write!(out, "\r\n{}", color::Fg(color::Reset)).unwrap();
-    write!(out, "{}Changes to be commited:", color::Fg(color::Blue)).unwrap();
-    write!(out, "\r\n{}", color::Fg(color::Reset)).unwrap();
+    write!(
+      out,
+      "{}Changes to be commited:\r\n{}",
+      color::Fg(color::Blue),
+      color::Fg(color::Reset)
+    )
+    .unwrap();
 
     for file_index in &self.staged_file_indexes {
       write!(
         out,
-        "{}{}{} ",
+        "{}{}{} {}\r\n",
         color::Fg(color::Magenta),
         file_index.status,
-        color::Fg(color::Reset)
+        color::Fg(color::Reset),
+        file_index.name
       )
       .unwrap();
-      write!(out, "{}", file_index.name).unwrap();
-      write!(out, "\r\n").unwrap();
     }
     write!(
       out,
-      "{}Changes not staged for commit:",
-      color::Fg(color::Blue)
+      "{}Changes not staged for commit:\r\n{}",
+      color::Fg(color::Blue),
+      color::Fg(color::Reset)
     )
     .unwrap();
-    write!(out, "\r\n{}", color::Fg(color::Reset)).unwrap();
     for file_index in &self.modified_file_indexes {
       write!(
         out,
-        "{}{}{} ",
+        "{}{}{} {}\r\n",
         color::Fg(color::Magenta),
         file_index.status,
-        color::Fg(color::Reset)
+        color::Fg(color::Reset),
+        file_index.name
       )
       .unwrap();
-      write!(out, "{}", file_index.name).unwrap();
-      write!(out, "\r\n").unwrap();
     }
 
     write!(
@@ -104,7 +150,7 @@ impl RGTStatus {
     }
   }
   fn cursor_down(&mut self) {
-    if self.cursor.row + 1 < self.lines {
+    if self.cursor.row + 1 < self.max_line_index {
       self.cursor.row += 1;
     }
   }
