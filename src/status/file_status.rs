@@ -1,6 +1,7 @@
 use git2::Repository;
 use std::process::Command;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileIndex {
   pub status: String,
   pub name: String,
