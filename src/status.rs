@@ -1,123 +1,135 @@
 extern crate termion;
+mod file_status;
 
-use git2::Repository;
-use std::io::{stdout, Write};
-use std::process::Command;
+use std::io::{stdin, stdout, Write};
 use termion::cursor;
+use termion::event::{Event, Key};
+use termion::input::TermRead;
 use termion::raw::IntoRawMode;
+use termion::screen::AlternateScreen;
 use termion::{clear, color};
 
-struct FileIndex {
-  status: String,
-  name: String,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Cursor {
+  row: usize,
+  column: usize,
+}
+
+// internal state of the rgt status screen
+struct RGTStatus {
+  cursor: Cursor,
+  lines: usize,
+  branch_name: String,
+  staged_file_indexes: Vec<file_status::FileIndex>,
+  modified_file_indexes: Vec<file_status::FileIndex>,
+}
+
+impl Default for RGTStatus {
+  fn default() -> Self {
+    Self {
+      cursor: Cursor { row: 0, column: 0 },
+      lines: 10, // TODO: Get from actual lines
+      branch_name: "".to_string(),
+      staged_file_indexes: Vec::new(),
+      modified_file_indexes: Vec::new(),
+    }
+  }
+}
+
+impl RGTStatus {
+  fn open(&mut self, path: String) {
+    self.branch_name = file_status::branch_name(path);
+    self.staged_file_indexes = file_status::staged_file_indexes();
+    self.modified_file_indexes = file_status::modified_file_indexes();
+  }
+
+  fn draw<T: Write>(&self, out: &mut T) {
+    write!(out, "{}", clear::All).unwrap();
+    write!(out, "{}", cursor::Goto(1, 1)).unwrap();
+
+    write!(
+      out,
+      "{}On branch {}",
+      color::Fg(color::Green),
+      self.branch_name
+    )
+    .unwrap();
+    write!(out, "\r\n{}", color::Fg(color::Reset)).unwrap();
+    write!(out, "{}Changes to be commited:", color::Fg(color::Blue)).unwrap();
+    write!(out, "\r\n{}", color::Fg(color::Reset)).unwrap();
+
+    for file_index in &self.staged_file_indexes {
+      write!(
+        out,
+        "{}{}{} ",
+        color::Fg(color::Magenta),
+        file_index.status,
+        color::Fg(color::Reset)
+      )
+      .unwrap();
+      write!(out, "{}", file_index.name).unwrap();
+      write!(out, "\r\n").unwrap();
+    }
+    write!(
+      out,
+      "{}Changes not staged for commit:",
+      color::Fg(color::Blue)
+    )
+    .unwrap();
+    write!(out, "\r\n{}", color::Fg(color::Reset)).unwrap();
+    for file_index in &self.modified_file_indexes {
+      write!(
+        out,
+        "{}{}{} ",
+        color::Fg(color::Magenta),
+        file_index.status,
+        color::Fg(color::Reset)
+      )
+      .unwrap();
+      write!(out, "{}", file_index.name).unwrap();
+      write!(out, "\r\n").unwrap();
+    }
+
+    write!(
+      out,
+      "{}",
+      cursor::Goto(self.cursor.column as u16 + 1, self.cursor.row as u16 + 1)
+    )
+    .unwrap();
+    out.flush().unwrap();
+  }
+  fn cursor_up(&mut self) {
+    if self.cursor.row > 0 {
+      self.cursor.row -= 1;
+    }
+  }
+  fn cursor_down(&mut self) {
+    if self.cursor.row + 1 < self.lines {
+      self.cursor.row += 1;
+    }
+  }
 }
 
 pub fn main(path: String) {
-  let mut stdout = stdout().into_raw_mode().unwrap();
-  write!(stdout, "{}", clear::All).unwrap();
-  write!(stdout, "{}", cursor::Goto(1, 1)).unwrap();
+  let mut state = RGTStatus::default();
+  state.open(path);
 
-  let name = branch_name(path);
-  write!(stdout, "{}On branch {}", color::Fg(color::Green), name).unwrap();
-  write!(stdout, "\r\n{}", color::Fg(color::Reset)).unwrap();
-  write!(stdout, "{}Changes to be commited:", color::Fg(color::Blue)).unwrap();
-  write!(stdout, "\r\n{}", color::Fg(color::Reset)).unwrap();
-  for file_index in staged_file_indexes() {
-    write!(
-      stdout,
-      "{}{}{} ",
-      color::Fg(color::Magenta),
-      file_index.status,
-      color::Fg(color::Reset)
-    )
-    .unwrap();
-    write!(stdout, "{}", file_index.name).unwrap();
-    write!(stdout, "\r\n").unwrap();
+  let stdin = stdin();
+  let mut stdout = AlternateScreen::from(stdout().into_raw_mode().unwrap());
+
+  state.draw(&mut stdout);
+
+  for evt in stdin.events() {
+    match evt.unwrap() {
+      Event::Key(Key::Ctrl('c')) => {
+        return;
+      }
+      Event::Key(Key::Up) => state.cursor_up(),
+      Event::Key(Key::Down) => state.cursor_down(),
+      _ => {}
+    }
+    state.draw(&mut stdout)
   }
-  write!(
-    stdout,
-    "{}Changes not staged for commit:",
-    color::Fg(color::Blue)
-  )
-  .unwrap();
-  write!(stdout, "\r\n{}", color::Fg(color::Reset)).unwrap();
-  for file_index in modified_file_indexes() {
-    write!(
-      stdout,
-      "{}{}{} ",
-      color::Fg(color::Magenta),
-      file_index.status,
-      color::Fg(color::Reset)
-    )
-    .unwrap();
-    write!(stdout, "{}", file_index.name).unwrap();
-    write!(stdout, "\r\n").unwrap();
-  }
+
   stdout.flush().unwrap();
-}
-
-fn ref_name(path: String) -> String {
-  let repo = match Repository::open(path) {
-    Ok(repo) => repo,
-    Err(e) => panic!("failed to open: {}", e),
-  };
-  let head = match repo.head() {
-    Ok(head) => head,
-    Err(e) => panic!("failed to open: {}", e),
-  };
-  let ref_name = head.name().unwrap();
-  return ref_name.to_string();
-}
-
-fn branch_name(path: String) -> String {
-  let ref_name = ref_name(path);
-  let pattern = "refs/heads/";
-  if ref_name.starts_with(pattern) {
-    return ref_name.trim_start_matches(pattern).to_string();
-  } else {
-    return ref_name;
-  }
-}
-
-fn staged_files_command_output() -> std::process::Output {
-  let output = Command::new("git")
-    .args(&["diff", "--cached", "--name-status"])
-    .output()
-    .expect("failed to execute the command: git diff --cached --name-status");
-  return output;
-}
-
-fn staged_file_indexes() -> Vec<FileIndex> {
-  let output = staged_files_command_output();
-  return file_indexes_for_output(output);
-}
-
-fn modified_files_command_output() -> std::process::Output {
-  let output = Command::new("git")
-    .args(&["diff", "--name-status"])
-    .output()
-    .expect("failed to execute the command: git diff --cached --name-status");
-  return output;
-}
-
-fn modified_file_indexes() -> Vec<FileIndex> {
-  let output = modified_files_command_output();
-  return file_indexes_for_output(output);
-}
-
-fn file_indexes_for_output(output: std::process::Output) -> Vec<FileIndex> {
-  let result = String::from(std::str::from_utf8(&(output.stdout)).unwrap());
-  let file_results: Vec<&str> = result.split("\n").collect();
-  let mut file_indexes: Vec<FileIndex> = Vec::new();
-  for file_result in file_results.iter() {
-    let status_and_file: Vec<&str> = file_result.split("\t").collect();
-    let status = status_and_file.first().unwrap();
-    let file_name = status_and_file.last().unwrap();
-    let file_index = FileIndex {
-      status: status.to_string(),
-      name: file_name.to_string(),
-    };
-    file_indexes.push(file_index)
-  }
-  return file_indexes;
 }
