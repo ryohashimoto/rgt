@@ -2,7 +2,9 @@ extern crate termion;
 mod file_status;
 
 use std::collections::LinkedList;
+use std::env::var;
 use std::io::{stdin, stdout, Write};
+use std::process::Command;
 use termion::cursor;
 use termion::event::{Event, Key};
 use termion::input::TermRead;
@@ -170,6 +172,15 @@ impl RGTStatus {
   fn unstage_file(&mut self) {
     file_status::unstage_file(self.find_file_row().file_index.clone().name);
   }
+  fn edit_file(&mut self) {
+    let editor = var("EDITOR").unwrap();
+    let file_name = self.find_file_row().file_index.clone().name;
+    Command::new(editor)
+      .arg(&file_name)
+      .status()
+      .expect("Could not open file by editor");
+  }
+
   fn find_file_row(&mut self) -> &FileRow {
     return self
       .file_list
@@ -197,6 +208,9 @@ pub fn main(path: String) {
       Event::Key(Key::Char('u')) => {
         state.unstage_file();
         state.reopen();
+      }
+      Event::Key(Key::Char('e')) => {
+        state.edit_file();
       }
       Event::Key(Key::Char('q')) => {
         return;
