@@ -4,6 +4,7 @@ use std::process::Command;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileIndex {
   pub status: String,
+  pub staged: bool,
   pub name: String,
 }
 
@@ -19,12 +20,12 @@ pub fn branch_name(path: String) -> String {
 
 pub fn staged_file_indexes() -> Vec<FileIndex> {
   let output = staged_files_command_output();
-  return file_indexes_for_output(output);
+  return file_indexes_for_output(output, true);
 }
 
 pub fn modified_file_indexes() -> Vec<FileIndex> {
   let output = modified_files_command_output();
-  return file_indexes_for_output(output);
+  return file_indexes_for_output(output, false);
 }
 
 pub fn stage_file(path: String) {
@@ -80,7 +81,7 @@ fn modified_files_command_output() -> std::process::Output {
   return output;
 }
 
-fn file_indexes_for_output(output: std::process::Output) -> Vec<FileIndex> {
+fn file_indexes_for_output(output: std::process::Output, staged: bool) -> Vec<FileIndex> {
   let result = String::from(std::str::from_utf8(&(output.stdout)).unwrap());
   let mut file_results: Vec<&str> = result.split("\n").collect();
   file_results.pop();
@@ -92,6 +93,7 @@ fn file_indexes_for_output(output: std::process::Output) -> Vec<FileIndex> {
     let file_index = FileIndex {
       status: status,
       name: file_name,
+      staged: staged,
     };
     file_indexes.push(file_index)
   }
