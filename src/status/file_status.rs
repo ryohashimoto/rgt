@@ -27,6 +27,18 @@ pub fn modified_file_indexes() -> Vec<FileIndex> {
   return file_indexes_for_output(output);
 }
 
+pub fn stage_file(path: String) {
+  stage_file_command_output(path);
+}
+
+fn stage_file_command_output(path: String) -> std::process::Output {
+  let output = Command::new("git")
+    .args(&["add", &path])
+    .output()
+    .expect("failed to stage the file");
+  return output;
+}
+
 fn ref_name(path: String) -> String {
   let repo = match Repository::open(path) {
     Ok(repo) => repo,
