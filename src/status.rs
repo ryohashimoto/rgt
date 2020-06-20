@@ -198,11 +198,11 @@ pub fn main(path: String) {
         state.unstage_file();
         state.reopen();
       }
-      Event::Key(Key::Ctrl('c')) => {
+      Event::Key(Key::Char('q')) => {
         return;
       }
-      Event::Key(Key::Up) => state.cursor_up(),
-      Event::Key(Key::Down) => state.cursor_down(),
+      Event::Key(Key::Char('k')) => state.cursor_up(),
+      Event::Key(Key::Char('j')) => state.cursor_down(),
       _ => {}
     }
     state.draw(&mut stdout)
