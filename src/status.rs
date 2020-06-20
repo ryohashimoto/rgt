@@ -23,7 +23,9 @@ struct FileRow {
 }
 
 // internal state of the rgt status screen
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct RGTStatus {
+  path: String,
   cursor: Cursor,
   branch_name: String,
   staged_file_indexes: Vec<file_status::FileIndex>,
@@ -36,6 +38,7 @@ struct RGTStatus {
 impl Default for RGTStatus {
   fn default() -> Self {
     Self {
+      path: "".to_string(),
       cursor: Cursor { row: 0, column: 0 },
       branch_name: "".to_string(),
       staged_file_indexes: Vec::new(),
@@ -55,6 +58,7 @@ impl Default for RGTStatus {
 
 impl RGTStatus {
   fn open(&mut self, path: String) {
+    self.path = path.clone();
     self.branch_name = file_status::branch_name(path);
     self.staged_file_indexes = file_status::staged_file_indexes();
     self.modified_file_indexes = file_status::modified_file_indexes();
@@ -84,6 +88,12 @@ impl RGTStatus {
       line_index += 1;
     }
     self.max_line_index = line_index;
+  }
+
+  fn reopen(&mut self) {
+    println!("{:?}", self);
+    self.open(self.path.clone());
+    println!("{:?}", self);
   }
 
   fn draw<T: Write>(&self, out: &mut T) {
@@ -154,6 +164,19 @@ impl RGTStatus {
       self.cursor.row += 1;
     }
   }
+  fn stage_file(&mut self) {
+    file_status::stage_file(self.find_file_row().file_index.clone().name);
+  }
+  fn unstage_file(&mut self) {
+    file_status::unstage_file(self.find_file_row().file_index.clone().name);
+  }
+  fn find_file_row(&mut self) -> &FileRow {
+    return self
+      .file_list
+      .iter()
+      .find(|&file_row| file_row.line_index == self.cursor.row)
+      .unwrap();
+  }
 }
 
 pub fn main(path: String) {
@@ -167,6 +190,14 @@ pub fn main(path: String) {
 
   for evt in stdin.events() {
     match evt.unwrap() {
+      Event::Key(Key::Char('a')) => {
+        state.stage_file();
+        state.reopen();
+      }
+      Event::Key(Key::Char('u')) => {
+        state.unstage_file();
+        state.reopen();
+      }
       Event::Key(Key::Ctrl('c')) => {
         return;
       }

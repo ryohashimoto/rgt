@@ -27,6 +27,30 @@ pub fn modified_file_indexes() -> Vec<FileIndex> {
   return file_indexes_for_output(output);
 }
 
+pub fn stage_file(path: String) {
+  stage_file_command_output(path);
+}
+
+pub fn unstage_file(path: String) {
+  unstage_file_command_output(path);
+}
+
+fn stage_file_command_output(path: String) -> std::process::Output {
+  let output = Command::new("git")
+    .args(&["add", &path])
+    .output()
+    .expect("failed to stage the file");
+  return output;
+}
+
+fn unstage_file_command_output(path: String) -> std::process::Output {
+  let output = Command::new("git")
+    .args(&["reset", "HEAD", &path])
+    .output()
+    .expect("failed to unstage the file");
+  return output;
+}
+
 fn ref_name(path: String) -> String {
   let repo = match Repository::open(path) {
     Ok(repo) => repo,
@@ -58,13 +82,13 @@ fn modified_files_command_output() -> std::process::Output {
 
 fn file_indexes_for_output(output: std::process::Output) -> Vec<FileIndex> {
   let result = String::from(std::str::from_utf8(&(output.stdout)).unwrap());
-  let file_results: Vec<&str> = result.split("\r\n").collect();
+  let mut file_results: Vec<&str> = result.split("\n").collect();
+  file_results.pop();
   let mut file_indexes: Vec<FileIndex> = Vec::new();
   for file_result in file_results.iter() {
     let status_and_file: Vec<&str> = file_result.split("\t").collect();
     let status = status_and_file.first().unwrap().to_string();
-    let mut file_name = status_and_file.last().unwrap().to_string();
-    file_name.pop();
+    let file_name = status_and_file.last().unwrap().to_string();
     let file_index = FileIndex {
       status: status,
       name: file_name,
