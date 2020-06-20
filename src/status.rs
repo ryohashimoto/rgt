@@ -165,12 +165,17 @@ impl RGTStatus {
     }
   }
   fn stage_file(&mut self) {
-    let found_file_row = self
+    file_status::stage_file(self.find_file_row().file_index.clone().name);
+  }
+  fn unstage_file(&mut self) {
+    file_status::unstage_file(self.find_file_row().file_index.clone().name);
+  }
+  fn find_file_row(&mut self) -> &FileRow {
+    return self
       .file_list
       .iter()
       .find(|&file_row| file_row.line_index == self.cursor.row)
       .unwrap();
-    file_status::stage_file(found_file_row.file_index.clone().name);
   }
 }
 
@@ -187,6 +192,10 @@ pub fn main(path: String) {
     match evt.unwrap() {
       Event::Key(Key::Char('a')) => {
         state.stage_file();
+        state.reopen();
+      }
+      Event::Key(Key::Char('u')) => {
+        state.unstage_file();
         state.reopen();
       }
       Event::Key(Key::Ctrl('c')) => {

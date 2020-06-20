@@ -31,11 +31,23 @@ pub fn stage_file(path: String) {
   stage_file_command_output(path);
 }
 
+pub fn unstage_file(path: String) {
+  unstage_file_command_output(path);
+}
+
 fn stage_file_command_output(path: String) -> std::process::Output {
   let output = Command::new("git")
     .args(&["add", &path])
     .output()
     .expect("failed to stage the file");
+  return output;
+}
+
+fn unstage_file_command_output(path: String) -> std::process::Output {
+  let output = Command::new("git")
+    .args(&["reset", "HEAD", &path])
+    .output()
+    .expect("failed to unstage the file");
   return output;
 }
 
