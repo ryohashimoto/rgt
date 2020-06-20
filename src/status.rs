@@ -2,7 +2,9 @@ extern crate termion;
 mod file_status;
 
 use std::collections::LinkedList;
+use std::env::var;
 use std::io::{stdin, stdout, Write};
+use std::process::Command;
 use termion::cursor;
 use termion::event::{Event, Key};
 use termion::input::TermRead;
@@ -49,6 +51,7 @@ impl Default for RGTStatus {
         file_index: file_status::FileIndex {
           status: "".to_string(),
           name: "".to_string(),
+          staged: false,
         },
       },
       max_line_index: 0,
@@ -170,6 +173,23 @@ impl RGTStatus {
   fn unstage_file(&mut self) {
     file_status::unstage_file(self.find_file_row().file_index.clone().name);
   }
+  fn stage_or_unstage_file(&mut self) {
+    let file_index = self.find_file_row().file_index.clone();
+    if file_index.staged {
+      self.unstage_file()
+    } else {
+      self.stage_file()
+    }
+  }
+  fn edit_file(&mut self) {
+    let editor = var("EDITOR").unwrap();
+    let file_name = self.find_file_row().file_index.clone().name;
+    Command::new(editor)
+      .arg(&file_name)
+      .status()
+      .expect("Could not open file by editor");
+  }
+
   fn find_file_row(&mut self) -> &FileRow {
     return self
       .file_list
@@ -190,19 +210,18 @@ pub fn main(path: String) {
 
   for evt in stdin.events() {
     match evt.unwrap() {
-      Event::Key(Key::Char('a')) => {
-        state.stage_file();
-        state.reopen();
-      }
       Event::Key(Key::Char('u')) => {
-        state.unstage_file();
+        state.stage_or_unstage_file();
         state.reopen();
       }
-      Event::Key(Key::Ctrl('c')) => {
+      Event::Key(Key::Char('e')) => {
+        state.edit_file();
+      }
+      Event::Key(Key::Char('q')) => {
         return;
       }
-      Event::Key(Key::Up) => state.cursor_up(),
-      Event::Key(Key::Down) => state.cursor_down(),
+      Event::Key(Key::Char('k')) => state.cursor_up(),
+      Event::Key(Key::Char('j')) => state.cursor_down(),
       _ => {}
     }
     state.draw(&mut stdout)
