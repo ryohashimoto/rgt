@@ -4,7 +4,8 @@ mod file_status;
 use std::collections::LinkedList;
 use std::env::var;
 use std::io::{stdin, stdout, Write};
-use std::process::Command;
+use std::os::unix::io::{AsRawFd, FromRawFd};
+use std::process::{Child, Command, Stdio};
 use termion::cursor;
 use termion::event::{Event, Key};
 use termion::input::TermRead;
@@ -199,19 +200,45 @@ impl RGTStatus {
   }
   fn edit_file(&mut self) {
     let editor = var("EDITOR").unwrap();
-    let file_name = self.find_file_row().file_index.clone().name;
+    let file_name = self.find_file_name();
     Command::new(editor)
       .arg(&file_name)
       .status()
       .expect("Could not open file by editor");
   }
-
+  fn stdout_to_stdin(&mut self, process: &Child) -> Option<Stdio> {
+    if let Some(ref stdout) = process.stdout {
+      return Some(unsafe { Stdio::from_raw_fd(stdout.as_raw_fd()) });
+    }
+    None
+  }
+  fn diff_file(&mut self) {
+    let file_name = self.find_file_name();
+    let mut git_diff_command = Command::new("git")
+      .args(&["diff", &file_name])
+      .stdout(Stdio::piped())
+      .spawn()
+      .expect("Could not execute gif diff command");
+    let mut delta_command = Command::new("delta")
+      .stdin(
+        self
+          .stdout_to_stdin(&git_diff_command)
+          .expect("broken pipe"),
+      )
+      .spawn()
+      .expect("Could not execute delta command");
+    git_diff_command.wait().unwrap();
+    delta_command.wait().unwrap();
+  }
   fn find_file_row(&mut self) -> &FileRow {
     return self
       .file_list
       .iter()
       .find(|&file_row| file_row.line_index == self.cursor.row)
       .unwrap();
+  }
+  fn find_file_name(&mut self) -> String {
+    return self.find_file_row().file_index.clone().name;
   }
 }
 
@@ -232,6 +259,9 @@ pub fn main(path: String) {
       }
       Event::Key(Key::Char('e')) => {
         state.edit_file();
+      }
+      Event::Key(Key::Char('\n')) => {
+        state.diff_file();
       }
       Event::Key(Key::Char('q')) => {
         return;
