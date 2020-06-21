@@ -67,28 +67,36 @@ impl RGTStatus {
     self.modified_file_indexes = file_status::modified_file_indexes();
     self.file_list = LinkedList::new();
     let mut line_index = 2;
-    for file_index in &self.staged_file_indexes {
-      let file_row = FileRow {
-        line_index: line_index,
-        file_index: file_index.clone(),
-      };
-      if self.file_list.is_empty() {
-        self.file_row = file_row.clone();
-      }
-      self.file_list.push_back(file_row);
+    if self.staged_file_indexes.is_empty() {
       line_index += 1;
+    } else {
+      for file_index in &self.staged_file_indexes {
+        let file_row = FileRow {
+          line_index: line_index,
+          file_index: file_index.clone(),
+        };
+        if self.file_list.is_empty() {
+          self.file_row = file_row.clone();
+        }
+        self.file_list.push_back(file_row);
+        line_index += 1;
+      }
     }
     line_index += 1;
-    for file_index in &self.modified_file_indexes {
-      let file_row = FileRow {
-        line_index: line_index,
-        file_index: file_index.clone(),
-      };
-      if self.file_list.is_empty() {
-        self.file_row = file_row.clone();
-      }
-      self.file_list.push_back(file_row);
+    if self.modified_file_indexes.is_empty() {
       line_index += 1;
+    } else {
+      for file_index in &self.modified_file_indexes {
+        let file_row = FileRow {
+          line_index: line_index,
+          file_index: file_index.clone(),
+        };
+        if self.file_list.is_empty() {
+          self.file_row = file_row.clone();
+        }
+        self.file_list.push_back(file_row);
+        line_index += 1;
+      }
     }
     self.max_line_index = line_index;
   }
@@ -119,16 +127,20 @@ impl RGTStatus {
     )
     .unwrap();
 
-    for file_index in &self.staged_file_indexes {
-      write!(
-        out,
-        "{}{}{} {}\r\n",
-        color::Fg(color::Magenta),
-        file_index.status,
-        color::Fg(color::Reset),
-        file_index.name
-      )
-      .unwrap();
+    if self.staged_file_indexes.is_empty() {
+      write!(out, "  (no files)\r\n").unwrap();
+    } else {
+      for file_index in &self.staged_file_indexes {
+        write!(
+          out,
+          "{}{}{} {}\r\n",
+          color::Fg(color::Magenta),
+          file_index.status,
+          color::Fg(color::Reset),
+          file_index.name
+        )
+        .unwrap();
+      }
     }
     write!(
       out,
@@ -137,16 +149,20 @@ impl RGTStatus {
       color::Fg(color::Reset)
     )
     .unwrap();
-    for file_index in &self.modified_file_indexes {
-      write!(
-        out,
-        "{}{}{} {}\r\n",
-        color::Fg(color::Magenta),
-        file_index.status,
-        color::Fg(color::Reset),
-        file_index.name
-      )
-      .unwrap();
+    if self.modified_file_indexes.is_empty() {
+      write!(out, "  (no files)\r\n").unwrap();
+    } else {
+      for file_index in &self.modified_file_indexes {
+        write!(
+          out,
+          "{}{}{} {}\r\n",
+          color::Fg(color::Magenta),
+          file_index.status,
+          color::Fg(color::Reset),
+          file_index.name
+        )
+        .unwrap();
+      }
     }
 
     write!(
