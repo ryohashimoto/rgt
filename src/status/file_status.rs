@@ -8,6 +8,15 @@ pub struct FileIndex {
   pub name: String,
 }
 
+pub fn default_file_index() -> FileIndex {
+  return FileIndex {
+    status: "".to_string(),
+    name: "".to_string(),
+
+    staged: false,
+  };
+}
+
 pub fn branch_name(path: String) -> String {
   let ref_name = ref_name(path);
   let pattern = "refs/heads/";

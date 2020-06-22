@@ -1,7 +1,6 @@
 extern crate termion;
 mod file_status;
 
-use std::collections::LinkedList;
 use std::env::var;
 use std::io::{stdin, stdout, Write};
 use std::os::unix::io::{AsRawFd, FromRawFd};
@@ -19,12 +18,6 @@ struct Cursor {
   column: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct FileRow {
-  line_index: usize,
-  file_index: file_status::FileIndex,
-}
-
 // internal state of the rgt status screen
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct RGTStatus {
@@ -33,8 +26,7 @@ struct RGTStatus {
   branch_name: String,
   staged_file_indexes: Vec<file_status::FileIndex>,
   modified_file_indexes: Vec<file_status::FileIndex>,
-  file_list: LinkedList<FileRow>,
-  file_row: FileRow,
+  file_list: Vec<file_status::FileIndex>,
   max_line_index: usize,
 }
 
@@ -46,15 +38,7 @@ impl Default for RGTStatus {
       branch_name: "".to_string(),
       staged_file_indexes: Vec::new(),
       modified_file_indexes: Vec::new(),
-      file_list: LinkedList::new(),
-      file_row: FileRow {
-        line_index: 0,
-        file_index: file_status::FileIndex {
-          status: "".to_string(),
-          name: "".to_string(),
-          staged: false,
-        },
-      },
+      file_list: Vec::new(),
       max_line_index: 0,
     }
   }
@@ -66,46 +50,41 @@ impl RGTStatus {
     self.branch_name = file_status::branch_name(path);
     self.staged_file_indexes = file_status::staged_file_indexes();
     self.modified_file_indexes = file_status::modified_file_indexes();
-    self.file_list = LinkedList::new();
-    let mut line_index = 2;
+    self.file_list = Vec::new();
+    self.forward_file_list(2);
     if self.staged_file_indexes.is_empty() {
-      line_index += 1;
+      self.forward_file_list(1);
     } else {
-      for file_index in &self.staged_file_indexes {
-        let file_row = FileRow {
-          line_index: line_index,
-          file_index: file_index.clone(),
-        };
-        if self.file_list.is_empty() {
-          self.file_row = file_row.clone();
-        }
-        self.file_list.push_back(file_row);
-        line_index += 1;
-      }
+      self.push_file_indexes(self.staged_file_indexes.to_vec());
     }
-    line_index += 1;
+    self.forward_file_list(1);
     if self.modified_file_indexes.is_empty() {
-      line_index += 1;
+      self.forward_file_list(1);
     } else {
-      for file_index in &self.modified_file_indexes {
-        let file_row = FileRow {
-          line_index: line_index,
-          file_index: file_index.clone(),
-        };
-        if self.file_list.is_empty() {
-          self.file_row = file_row.clone();
-        }
-        self.file_list.push_back(file_row);
-        line_index += 1;
-      }
+      self.push_file_indexes(self.modified_file_indexes.to_vec());
     }
-    self.max_line_index = line_index;
+  }
+
+  fn push_file_indexes(&mut self, file_indexes: Vec<file_status::FileIndex>) {
+    for file_index in file_indexes {
+      self.push_file_index(file_index.clone());
+    }
+  }
+
+  fn push_file_index(&mut self, file_index: file_status::FileIndex) {
+    self.file_list.push(file_index.clone());
+    self.max_line_index += 1;
+  }
+
+  fn forward_file_list(&mut self, n: usize) {
+    for _ in 1..=n {
+      self.file_list.push(file_status::default_file_index());
+    }
+    self.max_line_index += n;
   }
 
   fn reopen(&mut self) {
-    println!("{:?}", self);
     self.open(self.path.clone());
-    println!("{:?}", self);
   }
 
   fn draw<T: Write>(&self, out: &mut T) {
@@ -197,9 +176,8 @@ impl RGTStatus {
     }
   }
   fn stage_or_unstage_file(&mut self) {
-    match self.find_file_row() {
-      Some(file_row) => {
-        let file_index = file_row.file_index.clone();
+    match self.find_file_index() {
+      Some(file_index) => {
         if file_index.staged {
           self.unstage_file()
         } else {
@@ -248,15 +226,19 @@ impl RGTStatus {
     git_diff_command.wait().unwrap();
     delta_command.wait().unwrap();
   }
-  fn find_file_row(&mut self) -> Option<&FileRow> {
-    return self
-      .file_list
-      .iter()
-      .find(|&file_row| file_row.line_index == self.cursor.row);
+  fn find_file_index(&mut self) -> Option<&file_status::FileIndex> {
+    return self.file_list.get(self.cursor.row);
   }
   fn find_file_name(&mut self) -> Option<String> {
-    match self.find_file_row() {
-      Some(row) => Some(row.file_index.clone().name),
+    match self.find_file_index() {
+      Some(file_index) => {
+        let file_name = file_index.clone().name;
+        if file_name == "" {
+          None
+        } else {
+          Some(file_name)
+        }
+      }
       None => None,
     }
   }
