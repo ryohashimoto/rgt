@@ -185,26 +185,41 @@ impl RGTStatus {
     }
   }
   fn stage_file(&mut self) {
-    file_status::stage_file(self.find_file_row().file_index.clone().name);
+    match self.find_file_name() {
+      Some(file_name) => file_status::stage_file(file_name),
+      None => return,
+    }
   }
   fn unstage_file(&mut self) {
-    file_status::unstage_file(self.find_file_row().file_index.clone().name);
+    match self.find_file_name() {
+      Some(file_name) => file_status::unstage_file(file_name),
+      None => return,
+    }
   }
   fn stage_or_unstage_file(&mut self) {
-    let file_index = self.find_file_row().file_index.clone();
-    if file_index.staged {
-      self.unstage_file()
-    } else {
-      self.stage_file()
+    match self.find_file_row() {
+      Some(file_row) => {
+        let file_index = file_row.file_index.clone();
+        if file_index.staged {
+          self.unstage_file()
+        } else {
+          self.stage_file()
+        }
+      }
+      None => return,
     }
   }
   fn edit_file(&mut self) {
-    let editor = var("EDITOR").unwrap();
-    let file_name = self.find_file_name();
-    Command::new(editor)
-      .arg(&file_name)
-      .status()
-      .expect("Could not open file by editor");
+    match self.find_file_name() {
+      Some(file_name) => {
+        let editor = var("EDITOR").unwrap();
+        Command::new(editor)
+          .arg(&file_name)
+          .status()
+          .expect("Could not open file by editor");
+      }
+      None => return,
+    }
   }
   fn stdout_to_stdin(&mut self, process: &Child) -> Option<Stdio> {
     if let Some(ref stdout) = process.stdout {
@@ -213,7 +228,10 @@ impl RGTStatus {
     None
   }
   fn diff_file(&mut self) {
-    let file_name = self.find_file_name();
+    if let None = self.find_file_name() {
+      return;
+    }
+    let file_name = self.find_file_name().unwrap();
     let mut git_diff_command = Command::new("git")
       .args(&["diff", &file_name])
       .stdout(Stdio::piped())
@@ -230,15 +248,17 @@ impl RGTStatus {
     git_diff_command.wait().unwrap();
     delta_command.wait().unwrap();
   }
-  fn find_file_row(&mut self) -> &FileRow {
+  fn find_file_row(&mut self) -> Option<&FileRow> {
     return self
       .file_list
       .iter()
-      .find(|&file_row| file_row.line_index == self.cursor.row)
-      .unwrap();
+      .find(|&file_row| file_row.line_index == self.cursor.row);
   }
-  fn find_file_name(&mut self) -> String {
-    return self.find_file_row().file_index.clone().name;
+  fn find_file_name(&mut self) -> Option<String> {
+    match self.find_file_row() {
+      Some(row) => Some(row.file_index.clone().name),
+      None => None,
+    }
   }
 }
 
