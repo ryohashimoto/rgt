@@ -199,13 +199,18 @@ impl RGTStatus {
     }
   }
   fn diff_file(&mut self) {
-    if let None = self.find_file_name() {
+    if let None = self.find_file_index() {
       return;
     }
-    //
-    let file_name = self.find_file_name().unwrap();
+    let file_index = self.find_file_index().unwrap();
+    let file_name = &file_index.clone().name;
+    let mut args = vec!["diff"];
+    if file_index.staged {
+      args.push("--cached");
+    }
+    args.push(&file_name);
     Command::new("git")
-      .args(&["diff", &file_name])
+      .args(&args)
       .status()
       .expect("Could not execute gif diff command");
   }
