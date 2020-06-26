@@ -25,6 +25,7 @@ struct RGTStatus {
   branch_name: String,
   staged_file_indexes: Vec<file_status::FileIndex>,
   modified_file_indexes: Vec<file_status::FileIndex>,
+  untracked_file_indexes: Vec<file_status::FileIndex>,
   file_list: Vec<file_status::FileIndex>,
   max_line_index: usize,
 }
@@ -37,6 +38,7 @@ impl Default for RGTStatus {
       branch_name: "".to_string(),
       staged_file_indexes: Vec::new(),
       modified_file_indexes: Vec::new(),
+      untracked_file_indexes: Vec::new(),
       file_list: Vec::new(),
       max_line_index: 0,
     }
@@ -49,6 +51,7 @@ impl RGTStatus {
     self.branch_name = file_status::branch_name(path);
     self.staged_file_indexes = file_status::staged_file_indexes();
     self.modified_file_indexes = file_status::modified_file_indexes();
+    self.untracked_file_indexes = file_status::untracked_file_indexes();
     self.file_list = Vec::new();
     self.forward_file_list(2);
     if self.staged_file_indexes.is_empty() {
@@ -61,6 +64,12 @@ impl RGTStatus {
       self.forward_file_list(1);
     } else {
       self.push_file_indexes(self.modified_file_indexes.to_vec());
+    }
+    self.forward_file_list(1);
+    if self.untracked_file_indexes.is_empty() {
+      self.forward_file_list(1);
+    } else {
+      self.push_file_indexes(self.untracked_file_indexes.to_vec());
     }
   }
 
@@ -132,6 +141,28 @@ impl RGTStatus {
       write!(out, "  (no files)\r\n").unwrap();
     } else {
       for file_index in &self.modified_file_indexes {
+        write!(
+          out,
+          "{}{}{} {}\r\n",
+          color::Fg(color::Magenta),
+          file_index.status,
+          color::Fg(color::Reset),
+          file_index.name
+        )
+        .unwrap();
+      }
+    }
+    write!(
+      out,
+      "{}Untracked files:\r\n{}",
+      color::Fg(color::Blue),
+      color::Fg(color::Reset)
+    )
+    .unwrap();
+    if self.untracked_file_indexes.is_empty() {
+      write!(out, "  (no files)\r\n").unwrap();
+    } else {
+      for file_index in &self.untracked_file_indexes {
         write!(
           out,
           "{}{}{} {}\r\n",
