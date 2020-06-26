@@ -3,8 +3,7 @@ mod file_status;
 
 use std::env::var;
 use std::io::{stdin, stdout, Write};
-use std::os::unix::io::{AsRawFd, FromRawFd};
-use std::process::{Child, Command, Stdio};
+use std::process::Command;
 use termion::cursor;
 use termion::event::{Event, Key};
 use termion::input::TermRead;
@@ -199,32 +198,16 @@ impl RGTStatus {
       None => return,
     }
   }
-  fn stdout_to_stdin(&mut self, process: &Child) -> Option<Stdio> {
-    if let Some(ref stdout) = process.stdout {
-      return Some(unsafe { Stdio::from_raw_fd(stdout.as_raw_fd()) });
-    }
-    None
-  }
   fn diff_file(&mut self) {
     if let None = self.find_file_name() {
       return;
     }
+    //
     let file_name = self.find_file_name().unwrap();
-    let mut git_diff_command = Command::new("git")
+    Command::new("git")
       .args(&["diff", &file_name])
-      .stdout(Stdio::piped())
-      .spawn()
+      .status()
       .expect("Could not execute gif diff command");
-    let mut delta_command = Command::new("delta")
-      .stdin(
-        self
-          .stdout_to_stdin(&git_diff_command)
-          .expect("broken pipe"),
-      )
-      .spawn()
-      .expect("Could not execute delta command");
-    git_diff_command.wait().unwrap();
-    delta_command.wait().unwrap();
   }
   fn find_file_index(&mut self) -> Option<&file_status::FileIndex> {
     return self.file_list.get(self.cursor.row);
