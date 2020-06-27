@@ -12,6 +12,12 @@ use termion::screen::AlternateScreen;
 use termion::{clear, color};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Size {
+  pub width: usize,
+  pub height: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Cursor {
   row: usize,
   column: usize,
@@ -22,6 +28,7 @@ struct Cursor {
 struct RGTStatus {
   path: String,
   cursor: Cursor,
+  terminal_size: Size,
   branch_name: String,
   staged_file_indexes: Vec<file_status::FileIndex>,
   modified_file_indexes: Vec<file_status::FileIndex>,
@@ -35,6 +42,10 @@ impl Default for RGTStatus {
     Self {
       path: "".to_string(),
       cursor: Cursor { row: 0, column: 0 },
+      terminal_size: Size {
+        width: 0,
+        height: 0,
+      },
       branch_name: "".to_string(),
       staged_file_indexes: Vec::new(),
       modified_file_indexes: Vec::new(),
@@ -175,6 +186,23 @@ impl RGTStatus {
       }
     }
 
+    for _ in self.max_line_index..self.terminal_size.height - 2 {
+      write!(out, "\r\n").unwrap();
+    }
+    let mut status_message = "[status] Nothing to update".to_string();
+    let pad_size = self.terminal_size.width - status_message.len();
+    if pad_size > 0 {
+      status_message.push_str(&" ".repeat(pad_size));
+    }
+    write!(
+      out,
+      "{}{}{}\r\n",
+      color::Bg(color::Blue),
+      status_message,
+      color::Bg(color::Reset)
+    )
+    .unwrap();
+
     write!(
       out,
       "{}",
@@ -292,6 +320,9 @@ impl RGTStatus {
 pub fn main(path: String) {
   let mut state = RGTStatus::default();
   state.open(path);
+  let terminal_size = termion::terminal_size().unwrap();
+  state.terminal_size.width = terminal_size.0 as usize;
+  state.terminal_size.height = terminal_size.1 as usize;
 
   let stdin = stdin();
   let mut stdout = AlternateScreen::from(stdout().into_raw_mode().unwrap());
