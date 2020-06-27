@@ -245,6 +245,32 @@ impl RGTStatus {
       .status()
       .expect("Could not execute gif diff command");
   }
+  fn pager_file(&mut self) {
+    if let None = self.find_file_index() {
+      return;
+    }
+    let file_index = self.find_file_index().unwrap();
+    let file_name = &file_index.clone().name;
+    let pager = var("PAGER").unwrap();
+    if pager.len() == 0 {
+      return;
+    }
+    Command::new(pager)
+      .arg(&file_name)
+      .status()
+      .expect("Could not open file by pager");
+  }
+  fn diff_or_pager_file(&mut self) {
+    if let None = self.find_file_index() {
+      return;
+    }
+    let file_index = self.find_file_index().unwrap();
+    if file_index.untracked {
+      self.pager_file();
+    } else {
+      self.diff_file();
+    }
+  }
   fn find_file_index(&mut self) -> Option<&file_status::FileIndex> {
     return self.file_list.get(self.cursor.row);
   }
@@ -282,7 +308,7 @@ pub fn main(path: String) {
         state.edit_file();
       }
       Event::Key(Key::Char('\n')) => {
-        state.diff_file();
+        state.diff_or_pager_file();
       }
       Event::Key(Key::Char('q')) => {
         return;
