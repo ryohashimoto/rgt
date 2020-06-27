@@ -35,6 +35,7 @@ struct RGTStatus {
   untracked_file_indexes: Vec<file_status::FileIndex>,
   file_list: Vec<file_status::FileIndex>,
   max_line_index: usize,
+  status_message: String,
 }
 
 impl Default for RGTStatus {
@@ -52,6 +53,7 @@ impl Default for RGTStatus {
       untracked_file_indexes: Vec::new(),
       file_list: Vec::new(),
       max_line_index: 0,
+      status_message: "[status] Nothing to update".to_string(),
     }
   }
 }
@@ -189,7 +191,7 @@ impl RGTStatus {
     for _ in self.max_line_index..self.terminal_size.height - 2 {
       write!(out, "\r\n").unwrap();
     }
-    let mut status_message = "[status] Nothing to update".to_string();
+    let mut status_message = self.status_message.clone();
     let pad_size = self.terminal_size.width - status_message.len();
     if pad_size > 0 {
       status_message.push_str(&" ".repeat(pad_size));
@@ -215,11 +217,13 @@ impl RGTStatus {
     if self.cursor.row > 0 {
       self.cursor.row -= 1;
     }
+    self.update_status_message();
   }
   fn cursor_down(&mut self) {
     if self.cursor.row + 1 < self.max_line_index {
       self.cursor.row += 1;
     }
+    self.update_status_message();
   }
   fn stage_file(&mut self) {
     match self.find_file_name() {
@@ -313,6 +317,29 @@ impl RGTStatus {
         }
       }
       None => None,
+    }
+  }
+  fn update_status_message(&mut self) {
+    match self.find_file_index() {
+      Some(file_index) => {
+        if file_index.untracked && file_index.name.len() > 0 {
+          self.status_message = format!(
+            "[status] Press u to stage '{}' for addition",
+            file_index.name
+          );
+        } else if file_index.staged {
+          self.status_message = format!(
+            "[status] Press u to unstage '{}' for commit",
+            file_index.name
+          );
+        } else if file_index.name.len() > 0 {
+          self.status_message =
+            format!("[status] Press u to stage '{}' for commit", file_index.name);
+        } else {
+          self.status_message = "[status] Nothing to update".to_string();
+        }
+      }
+      None => self.status_message = "[status] Nothing to update".to_string(),
     }
   }
 }
