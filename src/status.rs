@@ -65,6 +65,7 @@ impl RGTStatus {
     self.staged_file_indexes = file_status::staged_file_indexes();
     self.modified_file_indexes = file_status::modified_file_indexes();
     self.untracked_file_indexes = file_status::untracked_file_indexes();
+    self.max_line_index = 0;
     self.file_list = Vec::new();
     self.forward_file_list(2);
     if self.staged_file_indexes.is_empty() {
@@ -84,6 +85,9 @@ impl RGTStatus {
     } else {
       self.push_file_indexes(self.untracked_file_indexes.to_vec());
     }
+    let terminal_size = termion::terminal_size().unwrap();
+    self.terminal_size.width = terminal_size.0 as usize;
+    self.terminal_size.height = terminal_size.1 as usize;
   }
 
   fn push_file_indexes(&mut self, file_indexes: Vec<file_status::FileIndex>) {
@@ -309,6 +313,9 @@ impl RGTStatus {
       self.diff_file();
     }
   }
+  fn refresh_all(&mut self) {
+    self.reopen();
+  }
   fn find_file_index(&mut self) -> Option<&file_status::FileIndex> {
     return self.file_list.get(self.cursor.row);
   }
@@ -353,9 +360,6 @@ impl RGTStatus {
 pub fn main(path: String) {
   let mut state = RGTStatus::default();
   state.open(path);
-  let terminal_size = termion::terminal_size().unwrap();
-  state.terminal_size.width = terminal_size.0 as usize;
-  state.terminal_size.height = terminal_size.1 as usize;
 
   let stdin = stdin();
   let mut stdout = AlternateScreen::from(stdout().into_raw_mode().unwrap());
@@ -376,6 +380,9 @@ pub fn main(path: String) {
       }
       Event::Key(Key::Char('\n')) => {
         state.diff_or_pager_file();
+      }
+      Event::Key(Key::Char('r')) => {
+        state.refresh_all();
       }
       Event::Key(Key::Char('q')) => {
         return;
