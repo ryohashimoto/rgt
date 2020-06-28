@@ -225,6 +225,12 @@ impl RGTStatus {
     }
     self.update_status_message();
   }
+  fn commit_files(&mut self) {
+    Command::new("git")
+      .arg(&"commit")
+      .status()
+      .expect("Could not commit files");
+  }
   fn stage_file(&mut self) {
     match self.find_file_name() {
       Some(file_name) => file_status::stage_file(file_name),
@@ -358,6 +364,9 @@ pub fn main(path: String) {
 
   for evt in stdin.events() {
     match evt.unwrap() {
+      Event::Key(Key::Char('c')) => {
+        state.commit_files();
+      }
       Event::Key(Key::Char('u')) => {
         state.stage_or_unstage_file();
         state.reopen();
