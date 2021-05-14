@@ -376,6 +376,7 @@ pub fn main(path: String) {
         state.reopen();
       }
       Event::Key(Key::Char('e')) => {
+        println!("{}", clear::All);
         state.edit_file();
       }
       Event::Key(Key::Char('\n')) => {
