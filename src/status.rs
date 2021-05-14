@@ -389,8 +389,8 @@ pub fn main(path: String) {
         println!("{}", clear::All);
         return;
       }
-      Event::Key(Key::Char('k')) => state.cursor_up(),
-      Event::Key(Key::Char('j')) => state.cursor_down(),
+      Event::Key(Key::Char('k')) | Event::Key(Key::Up) => state.cursor_up(),
+      Event::Key(Key::Char('j')) | Event::Key(Key::Down) => state.cursor_down(),
       _ => {}
     }
     state.draw(&mut stdout)
