@@ -4,7 +4,8 @@ use std::env;
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        println!("Available commands: status, --version, --help")
+        println!("Available commands: status");
+        println!("Available options:  --version, --help");
     } else {
         let mode = &args[1];
         if mode == "--version" || mode == "-v" {
