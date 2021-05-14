@@ -1,3 +1,4 @@
+mod log;
 mod status;
 use std::env;
 
@@ -21,6 +22,12 @@ fn main() {
                 status::main(args[2].to_string());
             } else {
                 status::main("./".to_string());
+            }
+        } else if mode == "log" {
+            if args.len() >= 3 {
+                log::main(args[2].to_string());
+            } else {
+                log::main("./".to_string());
             }
         }
     }
