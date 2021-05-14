@@ -385,6 +385,7 @@ pub fn main(path: String) {
         state.refresh_all();
       }
       Event::Key(Key::Char('q')) => {
+        println!("{}", clear::All);
         return;
       }
       Event::Key(Key::Char('k')) => state.cursor_up(),
